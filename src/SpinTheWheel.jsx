@@ -176,6 +176,85 @@ export default function SpinTheWheel() {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center casino-bg text-white p-4 relative overflow-hidden">
+      {bgChips.map((chip, i) => (
+        <motion.span
+          key={i}
+          className="text-3xl absolute select-none pointer-events-none"
+          style={{ top: `${chip.top}%`, left: `${chip.left}%`, opacity: 0.18, zIndex: 0 }}
+          animate={{ y: ["0%", "60%", "0%"] }}
+          transition={{ repeat: Infinity, duration: 10 + i * 0.1, ease: "linear" }}
+        >
+          {chip.chip}
+        </motion.span>
+      ))}
+      <div className="absolute inset-0 border-8 border-pink-500 rounded-2xl pointer-events-none neon-glow z-10" />
+      <h1 className="text-5xl font-extrabold mb-4 drop-shadow-lg tracking-widest neon-text z-20">🎰 Spin The Wheel</h1>
+      <WalletMultiButton className="mb-6 z-20" />
+
+      <audio ref={spinAudioRef} src="/spin.mp3" preload="auto" />
+      <audio ref={winAudioRef} src="/win.mp3" preload="auto" />
+
+      {publicKey && (
+        <>
+          <p className="mb-2 z-20">Available Spins: {spins}</p>
+          <p className="mb-2 text-yellow-300 z-20 font-mono text-2xl">Total Points: {points}</p>
+          <motion.div
+            animate={spinning ? { rotate: 1080 } : { rotate: 0, scale: 1 }}
+            transition={{ duration: 2.5, ease: "easeInOut" }}
+            className="w-64 h-64 bg-[url('/wheel.png')] bg-contain bg-no-repeat mb-6 border-8 border-yellow-400 neon-glow z-20 shadow-2xl"
+          />
+          <motion.button
+            whileHover={{ scale: 1.12, boxShadow: "0 0 20px #f472b6, 0 0 40px #fde047" }}
+            whileTap={{ scale: 0.94 }}
+            disabled={spinning || spins <= 0}
+            onClick={handleSpin}
+            className="px-12 py-6 text-3xl rounded-3xl font-extrabold shadow-xl neon-btn casino-btn-gradient relative z-30 border-4 border-yellow-400 disabled:opacity-50 transition-all duration-200"
+          >
+            <span className="animate-pulse">{spinning ? "Spinning..." : "SPIN"}</span>
+            <span className="absolute right-3 top-3 text-yellow-400 animate-bounce">💰</span>
+          </motion.button>
+
+          <AnimatePresence>
+            {showConfetti && (
+              <motion.div
+                key="confetti"
+                initial={{ opacity: 0, y: -40 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -40 }}
+                className="fixed inset-0 pointer-events-none flex items-center justify-center z-50"
+              >
+                <div className="text-8xl select-none animate-ping">🎉</div>
+                <div className="text-8xl select-none animate-bounce">🪙</div>
+                <div className="text-8xl select-none animate-pulse">💎</div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <AnimatePresence>
+            {result && !spinning && (
+              <motion.div
+                key={result.label}
+                className={`mt-6 text-center rounded-2xl shadow-2xl border-4 ${rarityFX(result.rarity)} z-40 casino-card-bg`}
+                initial={{ scale: 0.8, opacity: 0, y: 40 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                exit={{ scale: 0.8, opacity: 0, y: 40 }}
+                transition={{ type: "spring", stiffness: 200, damping: 14 }}
+              >
+                <p className="text-2xl font-black mb-2 drop-shadow-lg neon-text">{result.label}</p>
+                <p className="text-yellow-300 text-2xl font-mono">{result.points} Points</p>
+                <img src={`/${result.meme}`} alt="meme" className="mt-4 rounded-xl w-60 h-60 object-cover mx-auto shadow-lg casino-img-border" />
+                <button
+                  onClick={shareOnX}
+                  className="mt-6 px-6 py-3 bg-pink-500 rounded-xl font-extrabold neon-btn casino-btn-gradient shadow-xl hover:bg-pink-700"
+                >
+                  Share This Spin on X
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </>
+      )}
+
       <div className="mt-12 w-full max-w-xl z-20">
         <h2 className="text-3xl font-black mb-5 text-center neon-text drop-shadow-lg">
           🏆 Leaderboard (Week {getWeekNumber()})
@@ -203,4 +282,5 @@ export default function SpinTheWheel() {
     </div>
   );
 }
+
 
