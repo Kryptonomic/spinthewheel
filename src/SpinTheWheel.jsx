@@ -74,23 +74,14 @@ export default function SpinTheWheel() {
   }, [publicKey]);
 
   const getSpinEligibility = async (wallet) => {
-    try {
-      const tokens = await connection.getParsedTokenAccountsByOwner(wallet, {
-        mint: SPIN_TOKEN_MINT
-      });
-      const balance = tokens?.value?.[0]?.account?.data?.parsed?.info?.tokenAmount?.uiAmount || 0;
-      const simulatedHoldingMinutes = 30;
-      const bonusSpins = Math.floor(balance / 1_000_000);
-      const spinsAvailable = Math.floor(simulatedHoldingMinutes / 5) + bonusSpins;
-      setSpins(spinsAvailable);
-    } catch (e) {
-      console.error("Error fetching token info:", e);
-      setSpins(0);
-    }
+    const simulatedHoldingMinutes = 30;
+    const bonusSpins = 2; // simulate 2 bonus spins
+    const spinsAvailable = Math.floor(simulatedHoldingMinutes / 5) + bonusSpins;
+    setSpins(spinsAvailable);
   };
 
   const getStoredLeaderboard = async () => {
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from("leaderboard")
       .select("wallet, points")
       .order("points", { ascending: false });
@@ -98,14 +89,8 @@ export default function SpinTheWheel() {
   };
 
   const updateLeaderboard = async (wallet, newPoints, signature) => {
-    if (!signature) {
-      alert("Signature required. Please re-connect wallet.");
-      return;
-    }
-    if (window._spinCooldown && Date.now() - window._spinCooldown < 2500) {
-      alert("Slow down!");
-      return;
-    }
+    if (!signature) return;
+    if (window._spinCooldown && Date.now() - window._spinCooldown < 2500) return;
     window._spinCooldown = Date.now();
     const { data: existing } = await supabase
       .from("leaderboard")
@@ -135,7 +120,6 @@ export default function SpinTheWheel() {
         signature = Buffer.from(signed.signature).toString('base64');
       }
     } catch (e) {
-      console.error('Signature error', e);
       alert("Wallet signature failed");
     }
     setTimeout(() => {
@@ -190,10 +174,8 @@ export default function SpinTheWheel() {
       <div className="absolute inset-0 border-8 border-pink-500 rounded-2xl pointer-events-none neon-glow z-10" />
       <h1 className="text-5xl font-extrabold mb-4 drop-shadow-lg tracking-widest neon-text z-20">🎰 Spin The Wheel</h1>
       <WalletMultiButton className="mb-6 z-20" />
-
       <audio ref={spinAudioRef} src="/spin.mp3" preload="auto" />
       <audio ref={winAudioRef} src="/win.mp3" preload="auto" />
-
       {publicKey && (
         <>
           <p className="mb-2 z-20">Available Spins: {spins}</p>
@@ -203,17 +185,36 @@ export default function SpinTheWheel() {
             transition={{ duration: 2.5, ease: "easeInOut" }}
             className="w-64 h-64 bg-[url('/wheel.png')] bg-contain bg-no-repeat mb-6 border-8 border-yellow-400 neon-glow z-20 shadow-2xl"
           />
+          <AnimatePresence>
+            {spinning && (
+              <motion.div
+                key="spinOverlay"
+                className="fixed inset-0 flex flex-col items-center justify-center z-40 bg-black/70"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+              >
+                <div className="text-5xl font-black neon-text animate-pulse mb-8">SPINNING<span className="animate-bounce">...</span></div>
+                <motion.div
+                  animate={{ rotate: 360 }}
+                  transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
+                  className="w-40 h-40 bg-[url('/wheel.png')] bg-contain bg-no-repeat mx-auto neon-glow"
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
           <motion.button
             whileHover={{ scale: 1.12, boxShadow: "0 0 20px #f472b6, 0 0 40px #fde047" }}
             whileTap={{ scale: 0.94 }}
             disabled={spinning || spins <= 0}
             onClick={handleSpin}
-            className="px-12 py-6 text-3xl rounded-3xl font-extrabold shadow-xl neon-btn casino-btn-gradient relative z-30 border-4 border-yellow-400 disabled:opacity-50 transition-all duration-200"
+            className="px-12 py-6 text-3xl rounded-3xl font-extrabold shadow-xl neon-btn casino-btn-gradient relative z-30
+              border-4 border-yellow-400 disabled:opacity-50
+              transition-all duration-200"
           >
             <span className="animate-pulse">{spinning ? "Spinning..." : "SPIN"}</span>
             <span className="absolute right-3 top-3 text-yellow-400 animate-bounce">💰</span>
           </motion.button>
-
           <AnimatePresence>
             {showConfetti && (
               <motion.div
@@ -229,7 +230,6 @@ export default function SpinTheWheel() {
               </motion.div>
             )}
           </AnimatePresence>
-
           <AnimatePresence>
             {result && !spinning && (
               <motion.div
@@ -252,35 +252,33 @@ export default function SpinTheWheel() {
               </motion.div>
             )}
           </AnimatePresence>
+          <div className="mt-12 w-full max-w-xl z-20">
+            <h2 className="text-3xl font-black mb-5 text-center neon-text drop-shadow-lg">
+              🏆 Leaderboard (Week {getWeekNumber()})
+            </h2>
+            <ul className="bg-black/80 rounded-2xl p-5 space-y-3 border-4 border-pink-300 neon-glow">
+              {leaderboard.map((entry, index) => (
+                <li
+                  key={entry.wallet}
+                  className={`flex justify-between text-xl font-bold px-4 py-3 rounded-2xl shadow-lg
+                    ${index < 3 ? podiumBG[index] : "bg-gray-900 bg-opacity-70"} border-2 border-yellow-100`}
+                >
+                  <span>
+                    #{index + 1} - {entry.wallet.slice(0, 4)}...{entry.wallet.slice(-4)}
+                    {index === 0 && (
+                      <span className="ml-3 px-2 py-0.5 bg-yellow-400 text-black font-black rounded-lg shadow-inner animate-pulse">
+                        🏆 NFT Winner
+                      </span>
+                    )}
+                    {index === 1 && <span className="ml-2">🥈</span>}
+                    {index === 2 && <span className="ml-2">🥉</span>}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
         </>
       )}
-
-      <div className="mt-12 w-full max-w-xl z-20">
-        <h2 className="text-3xl font-black mb-5 text-center neon-text drop-shadow-lg">
-          🏆 Leaderboard (Week {getWeekNumber()})
-        </h2>
-        <ul className="bg-black/80 rounded-2xl p-5 space-y-3 border-4 border-pink-300 neon-glow">
-          {leaderboard.map((entry, index) => (
-            <li
-              key={entry.wallet}
-              className={`flex justify-between text-xl font-bold px-4 py-3 rounded-2xl shadow-lg ${index < 3 ? podiumBG[index] : "bg-gray-900 bg-opacity-70"} border-2 border-yellow-100`}
-            >
-              <span>
-                #{index + 1} - {entry.wallet.slice(0, 4)}...{entry.wallet.slice(-4)}
-                {index === 0 && (
-                  <span className="ml-3 px-2 py-0.5 bg-yellow-400 text-black font-black rounded-lg shadow-inner animate-pulse">
-                    🏆 NFT Winner
-                  </span>
-                )}
-                {index === 1 && <span className="ml-2">🥈</span>}
-                {index === 2 && <span className="ml-2">🥉</span>}
-              </span>
-            </li>
-          ))}
-        </ul>
-      </div>
     </div>
   );
 }
-
-
